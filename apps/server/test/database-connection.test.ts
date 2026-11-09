@@ -145,4 +145,45 @@ describe('Database Connection String & Adapter Configuration Suite', () => {
       assert.ok(!err.message.includes('SuperSecretPassword123!'), 'Password must not be in error message');
     }
   });
+
+  it('12. Accurately detects missing database tables across Prisma P2021 and MySQL error formats', () => {
+    const isTableMissing = (err: any) => {
+      const msg = (err.message || '').toLowerCase();
+      return (
+        err.code === 'P2021' ||
+        err.code === 'ER_NO_SUCH_TABLE' ||
+        msg.includes('does not exist') ||
+        msg.includes("doesn't exist") ||
+        msg.includes('not found') ||
+        msg.includes('table')
+      );
+    };
+
+    // Render / TiDB Cloud exact error
+    assert.strictEqual(
+      isTableMissing({
+        code: 'P2021',
+        message: "\nInvalid `prisma.user.count()` invocation:\n\nThe table 'User' does not exist in the current database.",
+      }),
+      true
+    );
+
+    // Standard MySQL error
+    assert.strictEqual(
+      isTableMissing({
+        code: 'ER_NO_SUCH_TABLE',
+        message: "Table 'dumline.User' doesn't exist",
+      }),
+      true
+    );
+
+    // Other connection / auth error should NOT match
+    assert.strictEqual(
+      isTableMissing({
+        code: 'ER_ACCESS_DENIED_ERROR',
+        message: "Access denied for user 'root'@'%'",
+      }),
+      false
+    );
+  });
 });

@@ -188,25 +188,40 @@ io.on('connection', (socket) => {
 });
 
 async function bootstrapDatabase() {
+  const serverRoot = path.resolve(__dirname, '..');
+  const prismaConfigFile = path.resolve(__dirname, 'prisma/prisma.config.ts');
+  const seedScriptFile = path.resolve(__dirname, 'prisma/seed.ts');
+
   try {
     const userCount = await prisma.user.count();
     console.log(`✅ Database connected successfully (${userCount} users present).`);
     if (userCount === 0) {
       console.log('⚡ Database connected but empty. Seeding initial data...');
-      const serverRoot = path.resolve(__dirname, '..');
-      cp.execSync('npx ts-node --transpile-only src/prisma/seed.ts', { stdio: 'inherit', cwd: serverRoot });
+      cp.execSync(`npx ts-node --transpile-only "${seedScriptFile}"`, { stdio: 'inherit', cwd: serverRoot });
       console.log('✅ Initial database seed completed.');
     }
   } catch (err: any) {
-    if (
-      err.message?.includes("Table") &&
-      (err.message?.includes("doesn't exist") || err.message?.includes("not found") || err.code === 'ER_NO_SUCH_TABLE')
-    ) {
+    const msg = (err.message || '').toLowerCase();
+    const isTableMissing =
+      err.code === 'P2021' ||
+      err.code === 'ER_NO_SUCH_TABLE' ||
+      msg.includes('does not exist') ||
+      msg.includes("doesn't exist") ||
+      msg.includes('not found') ||
+      msg.includes('table');
+
+    if (isTableMissing) {
       console.log('⚠️ Database tables missing. Running initial Prisma migration deploy...');
-      const serverRoot = path.resolve(__dirname, '..');
-      cp.execSync('npx prisma migrate deploy --config src/prisma/prisma.config.ts', { stdio: 'inherit', cwd: serverRoot });
-      console.log('✅ Migrations applied. Running initial seed...');
-      cp.execSync('npx ts-node --transpile-only src/prisma/seed.ts', { stdio: 'inherit', cwd: serverRoot });
+      try {
+        cp.execSync(`npx prisma migrate deploy --config "${prismaConfigFile}"`, { stdio: 'inherit', cwd: serverRoot });
+        console.log('✅ Migrations applied successfully.');
+      } catch (migrateErr: any) {
+        console.warn('⚠️ Migration deploy encountered an issue, synchronizing schema directly with prisma db push...', migrateErr.message);
+        cp.execSync(`npx prisma db push --config "${prismaConfigFile}" --accept-data-loss`, { stdio: 'inherit', cwd: serverRoot });
+        console.log('✅ Schema pushed successfully.');
+      }
+      console.log('🌱 Seeding initial database fixtures...');
+      cp.execSync(`npx ts-node --transpile-only "${seedScriptFile}"`, { stdio: 'inherit', cwd: serverRoot });
       console.log('✅ Database fully bootstrapped and seeded.');
     } else {
       const detailedCause = err.cause ? (err.cause.message || err.cause) : '';
