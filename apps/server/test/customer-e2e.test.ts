@@ -173,8 +173,8 @@ test('Phase 6: Full Customer E2E Workflow & Edge Cases', async (t) => {
             itemName: 'Chicken dum biryani family pack',
             quantity: 1,
             selectedOptions: {
-              Spice: 'Shahi Spicy',
-              Accompaniment: 'Extra Mirchi Ka Salan',
+              'Spice Profile': 'Shahi Spicy',
+              'Accompaniments & Staging': 'Standard Handi Pack',
             },
           },
           {
@@ -240,7 +240,7 @@ test('Phase 6: Full Customer E2E Workflow & Edge Cases', async (t) => {
             itemId: 'item-chk-dum-fam',
             itemName: 'Chicken dum biryani family pack',
             quantity: 1,
-            selectedOptions: { Spice: 'Shahi Spicy' },
+            selectedOptions: { 'Spice Profile': 'Shahi Spicy' },
           },
         ],
         deliveryAddress: {

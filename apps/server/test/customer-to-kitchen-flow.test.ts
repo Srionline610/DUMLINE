@@ -39,12 +39,18 @@ test('Full Customer to Kitchen Flow & Order History Verification', async (t) => 
           itemId: 'item-mut-dum',
           itemName: 'Mutton dum biryani',
           quantity: 2,
-          selectedOptions: { spiceLevel: 'ROYAL_SPICY', portionSize: 'PORTION_FAMILY' },
+          selectedOptions: {
+            'Spice Profile': 'Royal Medium',
+            'Accompaniments & Staging': 'Standard Handi Pack',
+          },
         },
         {
           itemId: 'item-mut-haleem',
           itemName: 'Mutton haleem',
           quantity: 1,
+          selectedOptions: {
+            'Garnish & Pure Desi Ghee': 'Desi Ghee & Crispy Birista',
+          },
         },
       ],
       deliveryAddress: {
