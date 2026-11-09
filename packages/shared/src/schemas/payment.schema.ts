@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { PaymentMethodSchema } from './order.schema';
+import type { ProcessPaymentRequest } from '../types/payment';
 
 export const ProcessPaymentRequestSchema = z
   .object({
@@ -18,7 +19,7 @@ export const ProcessPaymentRequestSchema = z
     idempotencyKey: z.string().trim().min(1).optional(),
   })
   .refine(
-    (data: { method?: string; vpa?: string; cardLast4?: string }) => {
+    (data: ProcessPaymentRequest) => {
       if (data.method === 'UPI' && !data.vpa) {
         return false;
       }
