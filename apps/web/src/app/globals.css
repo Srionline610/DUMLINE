@@ -1,0 +1,181 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: #F7F3EA;
+    --foreground: #211C18;
+    --primary: #9E3428;
+    --accent: #C18A3B;
+  }
+
+  body {
+    background-color: #F7F3EA;
+    color: #211C18;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Accessible focus indicators */
+  :focus-visible {
+    outline: 2px solid #9E3428;
+    outline-offset: 2px;
+  }
+
+  /* Modern Web Guidance: Native Dialog containment */
+  dialog:modal {
+    overscroll-behavior: contain;
+  }
+
+  dialog::backdrop {
+    overflow: hidden;
+    overscroll-behavior: contain;
+    background-color: rgba(33, 28, 24, 0.7);
+    backdrop-filter: blur(4px);
+  }
+}
+
+/* Reduced motion preference respect */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Custom subtle scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #EFE7D8;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #C18A3B;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #8C5E1A;
+}
+
+/* Atmospheric Steam & Cinematic Vignette */
+.bg-radial-vignette {
+  background: radial-gradient(circle at center, transparent 30%, rgba(20, 17, 14, 0.85) 90%);
+}
+
+@keyframes riseAndFade {
+  0% {
+    transform: translateY(0) scale(1) translateX(0);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.5;
+  }
+  60% {
+    opacity: 0.3;
+    transform: translateY(-80px) scale(1.6) translateX(15px);
+  }
+  100% {
+    transform: translateY(-160px) scale(2.2) translateX(-20px);
+    opacity: 0;
+  }
+}
+
+.steam-particle {
+  position: absolute;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.45) 0%, rgba(247, 243, 234, 0.15) 45%, transparent 70%);
+  filter: blur(24px);
+  pointer-events: none;
+}
+
+.steam-1 {
+  animation: riseAndFade 4.2s infinite ease-out;
+  left: 45%;
+}
+
+.steam-2 {
+  animation: riseAndFade 5s infinite ease-out 1.2s;
+  left: 50%;
+}
+
+.steam-3 {
+  animation: riseAndFade 4.6s infinite ease-out 2.4s;
+  left: 40%;
+}
+
+@keyframes pulseSlow {
+  0%, 100% {
+    transform: scale(1.03);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulseSlow 8s infinite ease-in-out;
+}
+
+@keyframes riseEmber1 {
+  0% {
+    transform: translateY(0) scale(0.6);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.9;
+  }
+  80% {
+    opacity: 0.6;
+    transform: translateY(-120px) translateX(25px) scale(1);
+  }
+  100% {
+    transform: translateY(-200px) translateX(40px) scale(0.2);
+    opacity: 0;
+  }
+}
+
+@keyframes riseEmber2 {
+  0% {
+    transform: translateY(0) scale(0.8);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.8;
+  }
+  70% {
+    opacity: 0.5;
+    transform: translateY(-140px) translateX(-20px) scale(1.1);
+  }
+  100% {
+    transform: translateY(-230px) translateX(-35px) scale(0.3);
+    opacity: 0;
+  }
+}
+
+.animate-rise-ember-1 {
+  animation: riseEmber1 4s infinite ease-out;
+  left: 48%;
+  bottom: 25%;
+}
+
+.animate-rise-ember-2 {
+  animation: riseEmber2 5.5s infinite ease-out 1.5s;
+  left: 52%;
+  bottom: 22%;
+}
+
+
+

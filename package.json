@@ -1,0 +1,15 @@
+{
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "engines": {
+    "node": ">=22.19.0 <27.0.0",
+    "npm": ">=10.0.0"
+  },
+  "scripts": {
+    "dev": "npm run dev --workspaces",
+    "build": "npm run build --workspaces",
+    "typecheck": "npm run typecheck --workspaces",
+    "test": "npm run test --workspaces"
+  }
+}
+

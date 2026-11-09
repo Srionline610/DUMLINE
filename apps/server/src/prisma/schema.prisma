@@ -1,0 +1,136 @@
+datasource db {
+  provider = "mysql"
+  // The URL is provided via prisma.config.ts at runtime
+}
+
+// --------------------------------------------------------------
+// Model: OrderItem
+// --------------------------------------------------------------
+model OrderItem {
+  id                String   @id @default(uuid())
+  orderId           String
+  itemName          String
+  unitPriceSnapshot Decimal  @db.Decimal(10,2)
+  quantity          Int
+  lineTotal         Decimal  @db.Decimal(10,2)
+  selectedOptionsJson String? @db.Text
+
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+// --------------------------------------------------------------
+// Model: Payment
+// --------------------------------------------------------------
+model Payment {
+  id             String   @id @default(uuid())
+  orderId        String
+  method         PaymentMethod
+  status         PaymentStatus
+  amount         Decimal  @db.Decimal(10,2)
+  transactionRef String?  @unique
+  failureReason  String?
+  paidAt         DateTime?
+
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// --------------------------------------------------------------
+// Enums
+// --------------------------------------------------------------
+enum Role {
+  CUSTOMER
+  KITCHEN_STAFF
+  OUTLET_MANAGER
+  ADMIN
+}
+
+enum FulfillmentType {
+  DELIVERY
+  PICKUP
+}
+
+enum OrderStatus {
+  PLACED
+  ACCEPTED
+  PREPARING
+  READY
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  UPI
+  CARD
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+// --------------------------------------------------------------
+// Model: User
+// --------------------------------------------------------------
+model User {
+  id               String   @id @default(uuid())
+  email            String   @unique
+  phone            String   @unique
+  passwordHash     String
+  fullName         String
+  role             Role     @default(CUSTOMER)
+  marketingConsent Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  orders           Order[]
+}
+
+// --------------------------------------------------------------
+// Model: Outlet
+// --------------------------------------------------------------
+model Outlet {
+  id               String   @id @default(uuid())
+  name             String
+  slug             String   @unique
+  address          String
+  city             String   @default("Hyderabad")
+  latitude         Decimal  @db.Decimal(10,8)
+  longitude        Decimal  @db.Decimal(11,8)
+  deliveryRadiusKm Decimal  @default(7.0) @db.Decimal(4,2)
+  minPrepMinutes   Int      @default(20)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  orders           Order[]
+}
+
+// --------------------------------------------------------------
+// Model: Order
+// --------------------------------------------------------------
+model Order {
+  id                String @id @default(uuid())
+  orderNumber       String @unique
+  customerId        String
+  outletId          String
+  fulfillmentType   FulfillmentType @default(DELIVERY)
+  status            OrderStatus @default(PLACED)
+  subtotal          Decimal @db.Decimal(10,2)
+  gstAmount         Decimal @db.Decimal(10,2)
+  deliveryFee       Decimal @default(0.00) @db.Decimal(10,2)
+  totalAmount       Decimal @db.Decimal(10,2)
+  deliveryAddressJson String? @db.Text
+  placedAt          DateTime @default(now())
+  promisedTime      DateTime
+  customer          User @relation(fields: [customerId], references: [id])
+  outlet            Outlet @relation(fields: [outletId], references: [id])
+  items    OrderItem[]
+  payments Payment[]
+}

@@ -1,11 +1,46 @@
+# Dependencies
 node_modules/
+/.pnp
+.pnp.js
+
+# Environment variables
 .env
 .env.*
 !.env.example
+
+# Production & Build outputs
 dist/
 build/
 coverage/
 .next/
+out/
+*.tsbuildinfo
+
+# Archives and binaries
+*.zip
+*.tar.gz
+*.tgz
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python
 __pycache__/
 .venv/
 venv/
+*.pyc
+
+# IDE & OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Turbo
+.turbo/
