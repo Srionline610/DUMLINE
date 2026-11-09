@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, Suspense } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '../../../store/authStore';
+import { useOutletStore } from '../../../store/outletStore';
 import ApiClient from '../../../lib/api';
 import { DEMO_CREDENTIALS } from '../../../lib/constants';
 import {
@@ -24,10 +25,17 @@ function LoginForm() {
   const redirectUrl = searchParams.get('redirect') || '/';
 
   const { setAuth } = useAuthStore();
+  const { outlets, setSelectedOutlet, loadOutlets } = useOutletStore();
   const [emailOrPhone, setEmailOrPhone] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (outlets.length === 0) {
+      loadOutlets();
+    }
+  }, [outlets, loadOutlets]);
 
   const getRoleDefaultDestination = (role: string): string => {
     switch (role) {
@@ -157,9 +165,13 @@ function LoginForm() {
         <div className="grid grid-cols-2 gap-2 text-xs">
           <button
             type="button"
-            onClick={() =>
-              handleQuickPersona(DEMO_CREDENTIALS.customer.email, DEMO_CREDENTIALS.customer.password, '/menu')
-            }
+            onClick={async () => {
+              const gachi = outlets.find((o) => o.slug.includes('gachibowli') || o.name.toLowerCase().includes('gachibowli')) || outlets[0];
+              if (gachi) {
+                setSelectedOutlet(gachi);
+              }
+              handleQuickPersona(DEMO_CREDENTIALS.customer.email, DEMO_CREDENTIALS.customer.password, '/menu');
+            }}
             className="flex items-center gap-2 rounded-xl border border-dumline-sand-dark bg-dumline-sand/20 p-2.5 text-left hover:bg-dumline-sand transition-colors"
           >
             <User className="h-4 w-4 text-dumline-crimson shrink-0" />

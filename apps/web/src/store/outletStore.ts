@@ -23,7 +23,7 @@ export const useOutletStore = create<OutletState>((set, get) => ({
       const outlets = await ApiClient.getOutlets(true);
       set({ outlets, isLoading: false });
 
-      // If no outlet is selected yet, select the first active one or restore from storage
+      // If no outlet is selected yet, select Gachibowli as the royal default or restore from storage
       const current = get().selectedOutlet;
       if (!current && outlets.length > 0) {
         let storedId: string | null = null;
@@ -31,7 +31,10 @@ export const useOutletStore = create<OutletState>((set, get) => ({
           storedId = localStorage.getItem('dumline_selected_outlet_id');
         }
         const matched = storedId ? outlets.find((o) => o.id === storedId) : null;
-        const initial = matched || outlets[0];
+        const gachibowliDefault =
+          outlets.find((o) => o.slug === 'gachibowli-cloud-kitchen' || o.slug.includes('gachibowli') || o.name.toLowerCase().includes('gachibowli')) ||
+          outlets[0];
+        const initial = matched || gachibowliDefault;
         set({ selectedOutlet: initial });
         if (typeof window !== 'undefined') {
           localStorage.setItem('dumline_selected_outlet_id', initial.id);
