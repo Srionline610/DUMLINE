@@ -252,8 +252,9 @@ In a production environment, DUMLINE is architected for containerized deployment
 ### 10.2 Component Deployment Guidelines
 
 1. **Frontend (Next.js 16)**:
-   - Deploy as a standalone Node.js container or deploy directly to **Vercel**.
-   - Build command: `npm run build --workspace=@dumline/web`
+   - Deploy as a standalone Node.js container or deploy directly to **Vercel** or **Railway**.
+   - Build command: `npm run build --workspace=@dumline/shared && npm run build --workspace=@dumline/web`
+   - Start command: `npm run start --workspace=@dumline/web`
    - Set environment variables: `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_SOCKET_URL` pointing to the public API domain (e.g., `https://api.dumline.com`).
 
 2. **Backend API & Real-Time Engine (Express 5 + Socket.IO 4)**:
@@ -262,9 +263,9 @@ In a production environment, DUMLINE is architected for containerized deployment
    - For horizontal scaling across multiple container instances, configure the `@socket.io/redis-adapter` with a managed Redis cluster.
 
 3. **Database (MySQL 8.0)**:
-   - Provision a managed database service such as **AWS RDS MySQL** or **Google Cloud SQL**.
+   - Provision a managed database service such as **AWS RDS MySQL** or **Railway Managed MySQL**.
    - Set `DATABASE_URL="mysql://user:password@db-host:3306/dumline_prod?sslaccept=strict"`.
-   - Run migrations via CI/CD before container startup: `npm run migrate --workspace=@dumline/server`.
+   - Run migrations via CI/CD before container startup: `npm run migrate:deploy --workspace=@dumline/server`.
 
 4. **Reverse Proxy & Load Balancing**:
    - NGINX or AWS Application Load Balancer (ALB) configured with WebSocket upgrade headers:
@@ -297,14 +298,14 @@ Railway is the recommended platform for deploying DUMLINE because it natively su
 2. Rename this service to `dumline-server` or `dumline-api`.
 3. In **Settings**:
    - **Root Directory**: leave as `/` (root of monorepo).
-   - **Build Command**: `npm run build --workspace=@dumline/server`
-   - **Start Command**: `npm run start --workspace=@dumline/server`
+   - **Build Command**: `npm run build --workspace=@dumline/shared && npm run generate --workspace=@dumline/server`
+   - **Start Command**: `npm run migrate:deploy --workspace=@dumline/server && npm run seed --workspace=@dumline/server && npm run start --workspace=@dumline/server`
    - **Healthcheck Path**: `/health`
 4. In **Variables**, add:
-   - `DATABASE_URL`: `${{MySQL.DATABASE_URL}}` (or `${{MySQL.MYSQL_URL}}` via Railway variable reference)
+   - `DATABASE_URL`: `${{MySQL.DATABASE_URL}}` (using Railway's variable reference syntax)
    - `NODE_ENV`: `production`
-   - `JWT_SECRET`: `dumline_production_secret_key_change_in_production_min_32_chars`
-   - `PORT`: `3000`
+   - `JWT_SECRET`: `dumline_production_jwt_secret_key_minimum_32_characters`
+   - `PORT`: (Auto-provided by Railway; defaults to 3000 if not set)
    - `GEMINI_API_KEY`: *(Optional, for AI prep-time estimation; falls back cleanly if empty)*
 5. In **Networking**:
    - Click **Generate Domain** to assign a public HTTPS domain (e.g., `dumline-api-production.up.railway.app`).
@@ -313,22 +314,12 @@ Railway is the recommended platform for deploying DUMLINE because it natively su
    {"status":"ok","service":"dumline-server","timestamp":"..."}
    ```
 
-#### Step 4: Run Database Migrations & Seeds on Railway
-Once the backend container connects to MySQL:
-1. Open the `dumline-server` service in Railway -> select **Deployments** or **Settings**.
-2. Open the **Railway CLI** (or the web **Deploy Logs / Shell**):
-   ```bash
-   npx prisma migrate deploy --config apps/server/src/prisma/prisma.config.ts
-   npm run seed --workspace=@dumline/server
-   ```
-3. This creates all relational tables and seeds all 3 mandatory IsoCode Labs assessment orders, 3 Hyderabad branches, 8 culinary items, and 6 role-based user accounts.
-
-#### Step 5: Deploy Frontend Web Client (`apps/web`)
+#### Step 4: Deploy Frontend Web Client (`apps/web`)
 1. In the project canvas, click **+ Create** / **New Service** -> **GitHub Repo** -> select `Srionline610/DUMLINE`.
 2. Rename this service to `dumline-web`.
 3. In **Settings**:
    - **Root Directory**: leave as `/`
-   - **Build Command**: `npm run build --workspace=@dumline/web`
+   - **Build Command**: `npm run build --workspace=@dumline/shared && npm run build --workspace=@dumline/web`
    - **Start Command**: `npm run start --workspace=@dumline/web`
 4. In **Variables**, add:
    - `NODE_ENV`: `production`
@@ -338,14 +329,14 @@ Once the backend container connects to MySQL:
    - Click **Generate Domain** (e.g., `dumline-web-production.up.railway.app`).
 6. Deploy the service.
 
-#### Step 6: End-to-End Verification of Live Deployment
+#### Step 5: End-to-End Verification of Live Deployment
 1. Visit your frontend URL `https://<YOUR-FRONTEND-DOMAIN>`.
 2. Verify guest browsing: view Royal Hyderabadi menu items, spice customizations, and outlet information.
 3. Select the **Kondapur** branch.
 4. Add items to cart (e.g., Shahi Nizami Dum Mutton Biryani) and proceed to Checkout.
 5. Log in with customer account `customer@dumline.com` (password: `Customer@123`).
 6. Complete mock payment with UPI `success@upi` or Card ending in `4242`. Order creates with unique ID.
-7. Open a second browser tab, log in as Kitchen Staff `kitchen.kondapur@dumline.com` (password: `Kitchen@123`), and navigate to `/kds`.
+7. Open a second browser tab, log in as Kitchen Staff `staff.kondapur@dumline.com` (password: `Staff@123`), and navigate to `/kds`.
 8. Confirm the new order appears in the Kondapur live kitchen queue in real-time via Socket.IO.
 9. Advance order status through `ACCEPTED` -> `PREPARING` -> `READY` and verify live status transitions on the customer's tracker screen.
 

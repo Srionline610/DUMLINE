@@ -10,7 +10,7 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 
 // Runtime Prisma client used by the application.
-const dbUrl = process.env.DATABASE_URL || process.env.MYSQL_URL || '';
+const dbUrl = (process.env.DATABASE_URL || process.env.MYSQL_URL || '') as string;
 const adapter = new PrismaMariaDb(dbUrl);
 export const prisma = new PrismaClient({ adapter });
 
