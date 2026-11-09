@@ -4,7 +4,7 @@
   "private": true,
   "main": "src/index.ts",
   "scripts": {
-    "dev": "ts-node-dev src/index.ts",
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "prisma generate --config src/prisma/prisma.config.ts",
     "start": "ts-node --transpile-only src/index.ts",
     "start:prod": "prisma migrate deploy --config src/prisma/prisma.config.ts && ts-node --transpile-only src/prisma/seed.ts && ts-node --transpile-only src/index.ts",
@@ -27,6 +27,7 @@
     "zod": "3.23.8"
   },
   "devDependencies": {
+    "@types/express": "^5.0.6",
     "@types/node": "^26.6.6",
     "prisma": "7.10.1",
     "ts-node": "10.9.2",
