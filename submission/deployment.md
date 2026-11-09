@@ -339,12 +339,12 @@ Railway is the recommended platform for deploying DUMLINE because it natively su
 #### Step 5: End-to-End Verification of Live Deployment
 1. Visit your frontend URL `https://<YOUR-FRONTEND-DOMAIN>`.
 2. Verify guest browsing: view Royal Hyderabadi menu items, spice customizations, and outlet information.
-3. Select the **Kondapur** branch.
+3. Select the **Gachibowli** branch (default) or **Kondapur** branch.
 4. Add items to cart (e.g., Shahi Nizami Dum Mutton Biryani) and proceed to Checkout.
 5. Log in with customer account `customer@dumline.com` (password: `Customer@123`).
 6. Complete mock payment with UPI `success@upi` or Card ending in `4242`. Order creates with unique ID.
-7. Open a second browser tab, log in as Kitchen Staff `staff.kondapur@dumline.com` (password: `Staff@123`), and navigate to `/kds`.
-8. Confirm the new order appears in the Kondapur live kitchen queue in real-time via Socket.IO.
+7. Open a second browser tab, log in as Kitchen Staff (1-click demo persona `staff.gachibowli@dumline.com` for Gachibowli, or `staff.kondapur@dumline.com` for Kondapur; password: `Staff@123`), and navigate to `/kds`.
+8. Confirm the new order appears in the live kitchen queue in real-time via Socket.IO.
 9. Advance order status through `ACCEPTED` -> `PREPARING` -> `READY` and verify live status transitions on the customer's tracker screen.
 
 ---

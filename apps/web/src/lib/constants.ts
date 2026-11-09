@@ -96,10 +96,10 @@ export const DEMO_CREDENTIALS = {
     name: 'Customer Demo',
   },
   kitchenStaff: {
-    email: 'staff.kondapur@dumline.com',
+    email: 'staff.gachibowli@dumline.com',
     password: 'Staff@123',
     role: 'KITCHEN_STAFF',
-    name: 'Kitchen Lead (Kondapur)',
+    name: 'Kitchen Lead (Gachibowli)',
   },
   outletManager: {
     email: 'manager.kondapur@dumline.com',
