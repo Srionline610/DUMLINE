@@ -25,6 +25,7 @@ if (isProduction) {
 
 export const config = {
   port: Number(process.env.PORT) || 3000,
+  host: process.env.HOST || '0.0.0.0',
   nodeEnv: process.env.NODE_ENV || 'development',
   jwtSecret: rawJwtSecret || 'dumline_dev_secret_key_change_in_production',
   corsOrigin: rawCorsOrigin || '*',

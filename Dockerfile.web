@@ -1,0 +1,32 @@
+# Production Dockerfile for DUMLINE Next.js Web Frontend
+FROM node:22-alpine AS base
+
+WORKDIR /app
+
+RUN apk add --no-cache libc6-compat
+
+# Copy package manifests for all workspaces
+COPY package.json package-lock.json tsconfig.base.json tsconfig.json ./
+COPY packages/shared/package.json ./packages/shared/
+COPY apps/server/package.json ./apps/server/
+COPY apps/web/package.json ./apps/web/
+
+# Install dependencies cleanly
+RUN npm ci
+
+# Copy shared package and web client source code
+COPY packages/shared ./packages/shared
+COPY apps/web ./apps/web
+
+# Build shared types/schemas and Next.js web application
+RUN npm run build --workspace=@dumline/shared
+RUN npm run build --workspace=@dumline/web
+
+# Expose frontend port
+EXPOSE 3001
+
+ENV NODE_ENV=production
+ENV PORT=3001
+
+# Start Next.js web server
+CMD ["npm", "run", "start", "--workspace=@dumline/web"]

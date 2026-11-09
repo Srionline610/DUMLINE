@@ -186,8 +186,8 @@ io.on('connection', (socket) => {
 });
 
 if (process.env.NODE_ENV !== 'test') {
-  server.listen(config.port, '0.0.0.0', () => {
-    console.log(`🏰 Dumline API server running on port ${config.port} (${config.nodeEnv})`);
+  server.listen(config.port, config.host, () => {
+    console.log(`🏰 Dumline API server running on ${config.host}:${config.port} (${config.nodeEnv})`);
     console.log(`🔌 Socket.IO endpoint ready`);
   });
 }
