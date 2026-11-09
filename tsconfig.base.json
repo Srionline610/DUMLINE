@@ -2,15 +2,13 @@
   "compilerOptions": {
     "target": "es2022",
     "module": "commonjs",
-    "moduleResolution": "node",
     "esModuleInterop": true,
     "strict": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "baseUrl": ".",
     "paths": {
-      "@dumline/shared": ["packages/shared/src/index.ts"],
-      "@dumline/shared/*": ["packages/shared/src/*"]
+      "@dumline/shared": ["./packages/shared/src/index.ts"],
+      "@dumline/shared/*": ["./packages/shared/src/*"]
     }
   }
 }
