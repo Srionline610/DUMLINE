@@ -59,6 +59,16 @@ export function signJwt(payload: Record<string, unknown>, expiresInSeconds = con
   return `${message}.${signatureB64}`;
 }
 
+export function decodeJwtUnverified(token: string): Record<string, any> | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    return JSON.parse(base64UrlDecode(parts[1]));
+  } catch {
+    return null;
+  }
+}
+
 export function verifyJwt(token: string): AuthTokenPayload | null {
   try {
     const parts = token.split('.');

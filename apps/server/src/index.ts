@@ -5,7 +5,7 @@ import { config } from './config';
 import prisma from './prisma/client';
 import { setSocketIOInstance } from './utils/socket';
 
-import { verifyJwt } from './utils/crypto';
+import { verifyJwt, decodeJwtUnverified } from './utils/crypto';
 
 const server = http.createServer(app);
 
@@ -42,47 +42,145 @@ io.use((socket, next) => {
     const payload = verifyJwt(token.trim());
     if (payload) {
       socket.data.user = payload;
+      return next();
     }
+    const unverified = decodeJwtUnverified(token.trim());
+    const now = Math.floor(Date.now() / 1000);
+    if (unverified?.exp && unverified.exp < now) {
+      return next(new Error('AUTH_EXPIRED_TOKEN'));
+    }
+    return next(new Error('AUTH_INVALID_TOKEN'));
   }
+
+  // Reject unauthenticated connections in production OR when strict auth is enabled
+  if (config.nodeEnv === 'production' || process.env.REQUIRE_SOCKET_AUTH === 'true') {
+    return next(new Error('AUTH_REQUIRED'));
+  }
+
   next();
 });
 
 io.on('connection', (socket) => {
-  socket.on('join:outlet', (outletId: string) => {
+  socket.on('join:outlet', (outletId: string, callback?: (res: any) => void) => {
     const user = socket.data.user;
+    if (!user) {
+      const err = { code: 'AUTH_REQUIRED', message: 'Authentication required to join kitchen outlet room' };
+      socket.emit('error', err);
+      if (typeof callback === 'function') callback({ success: false, error: err });
+      return;
+    }
+
+    // Role check: Only ADMIN, KITCHEN_STAFF, and OUTLET_MANAGER are permitted in kitchen outlet rooms!
+    const allowedKitchenRoles = ['ADMIN', 'KITCHEN_STAFF', 'OUTLET_MANAGER'];
+    if (!allowedKitchenRoles.includes(user.role)) {
+      const err = { code: 'FORBIDDEN_ROLE', message: `Role '${user.role}' is not authorized to join kitchen outlet rooms` };
+      socket.emit('error', err);
+      if (typeof callback === 'function') callback({ success: false, error: err });
+      return;
+    }
+
     if (outletId === 'ALL') {
-      if (user && user.role === 'ADMIN') {
+      if (user.role === 'ADMIN') {
         socket.join('outlet:ALL');
+        if (typeof callback === 'function') callback({ success: true, room: 'outlet:ALL' });
       } else {
-        socket.emit('error', { code: 'FORBIDDEN', message: 'Central Admin role required to monitor all kitchens' });
+        const err = { code: 'FORBIDDEN', message: 'Central Admin role required to monitor all kitchens' };
+        socket.emit('error', err);
+        if (typeof callback === 'function') callback({ success: false, error: err });
       }
       return;
     }
 
-    if (user && (user.role === 'KITCHEN_STAFF' || user.role === 'OUTLET_MANAGER')) {
-      if (user.assignedOutletId && user.assignedOutletId !== outletId) {
-        socket.emit('error', {
-          code: 'CROSS_OUTLET_FORBIDDEN',
-          message: 'Staff is isolated to assigned outlet queue only',
-        });
+    // Staff and Outlet Managers must have assignedOutletId and must match outletId
+    if (user.role === 'KITCHEN_STAFF' || user.role === 'OUTLET_MANAGER') {
+      if (!user.assignedOutletId || !user.assignedOutletId.trim()) {
+        const err = { code: 'MISSING_ASSIGNED_OUTLET', message: 'Staff or manager has no assigned outlet ID' };
+        socket.emit('error', err);
+        if (typeof callback === 'function') callback({ success: false, error: err });
+        return;
+      }
+      if (user.assignedOutletId !== outletId) {
+        const err = { code: 'CROSS_OUTLET_FORBIDDEN', message: 'Staff is isolated to assigned outlet queue only' };
+        socket.emit('error', err);
+        if (typeof callback === 'function') callback({ success: false, error: err });
         return;
       }
     }
+
+    // Admin can join any specific outlet; assigned staff/manager joins their outlet
     socket.join(`outlet:${outletId}`);
+    if (typeof callback === 'function') callback({ success: true, room: `outlet:${outletId}` });
   });
 
-  socket.on('join:all-outlets', () => {
+  socket.on('join:all-outlets', (callback?: (res: any) => void) => {
     const user = socket.data.user;
-    if (user && user.role === 'ADMIN') {
-      socket.join('outlet:ALL');
-    } else {
-      socket.emit('error', { code: 'FORBIDDEN', message: 'Central Admin role required to monitor all kitchens' });
+    if (!user || user.role !== 'ADMIN') {
+      const err = { code: 'FORBIDDEN', message: 'Central Admin role required to monitor all kitchens' };
+      socket.emit('error', err);
+      if (typeof callback === 'function') callback({ success: false, error: err });
+      return;
     }
+    socket.join('outlet:ALL');
+    if (typeof callback === 'function') callback({ success: true, room: 'outlet:ALL' });
   });
 
-  socket.on('join:order', (orderId: string) => {
-    if (typeof orderId === 'string' && orderId.trim()) {
-      socket.join(`order:${orderId.trim()}`);
+  socket.on('join:order', async (orderId: string, callback?: (res: any) => void) => {
+    const user = socket.data.user;
+    if (!user) {
+      const err = { code: 'AUTH_REQUIRED', message: 'Authentication required to join order room' };
+      socket.emit('error', err);
+      if (typeof callback === 'function') callback({ success: false, error: err });
+      return;
+    }
+
+    if (!orderId || typeof orderId !== 'string' || !orderId.trim()) {
+      const err = { code: 'INVALID_ORDER_ID', message: 'Valid orderId is required' };
+      socket.emit('error', err);
+      if (typeof callback === 'function') callback({ success: false, error: err });
+      return;
+    }
+
+    try {
+      const order = await prisma.order.findUnique({
+        where: { id: orderId.trim() },
+        select: { id: true, customerId: true, outletId: true },
+      });
+
+      if (!order) {
+        const err = { code: 'ORDER_NOT_FOUND', message: `Order '${orderId}' not found` };
+        socket.emit('error', err);
+        if (typeof callback === 'function') callback({ success: false, error: err });
+        return;
+      }
+
+      // Authorization checks:
+      let isAuthorized = false;
+
+      if (user.role === 'ADMIN') {
+        isAuthorized = true;
+      } else if (user.role === 'CUSTOMER') {
+        if (order.customerId === user.id) {
+          isAuthorized = true;
+        }
+      } else if (user.role === 'KITCHEN_STAFF' || user.role === 'OUTLET_MANAGER') {
+        if (user.assignedOutletId && user.assignedOutletId === order.outletId) {
+          isAuthorized = true;
+        }
+      }
+
+      if (!isAuthorized) {
+        const err = { code: 'ORDER_FORBIDDEN', message: 'Unauthorized to access this order room' };
+        socket.emit('error', err);
+        if (typeof callback === 'function') callback({ success: false, error: err });
+        return;
+      }
+
+      socket.join(`order:${order.id}`);
+      if (typeof callback === 'function') callback({ success: true, room: `order:${order.id}` });
+    } catch (e: any) {
+      const err = { code: 'SERVER_ERROR', message: e.message || 'Failed to authorize order room' };
+      socket.emit('error', err);
+      if (typeof callback === 'function') callback({ success: false, error: err });
     }
   });
 });

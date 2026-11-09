@@ -29,6 +29,8 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     res.header('Access-Control-Allow-Origin', origin);
     res.header('Vary', 'Origin');
     res.header('Access-Control-Allow-Credentials', 'true');
+  } else if (origin && config.nodeEnv === 'production') {
+    return next(AppError.forbidden(`Origin '${origin}' is not permitted by CORS policy`, 'CORS_FORBIDDEN'));
   }
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');

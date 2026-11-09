@@ -16,6 +16,7 @@ require('./customer-to-kitchen-flow.test');
 require('./rbac-access.test');
 require('./master-audit.test');
 require('./branch-kds.test');
+require('./socket-authorization.test');
 
 // Global teardown after all test suites complete
 after(async () => {

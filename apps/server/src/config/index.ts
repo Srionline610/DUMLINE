@@ -8,18 +8,26 @@ dotenv.config();
 
 const isProduction = (process.env.NODE_ENV || 'development') === 'production';
 const rawJwtSecret = process.env.JWT_SECRET?.trim() || '';
+const rawCorsOrigin = (process.env.CORS_ORIGIN || process.env.FRONTEND_URL || '').trim();
 
-if (isProduction && (!rawJwtSecret || rawJwtSecret.includes('change_in_production') || rawJwtSecret.length < 32)) {
-  throw new Error(
-    'FATAL SECURITY CONFIGURATION: JWT_SECRET must be set in production to a secure random string of at least 32 characters.'
-  );
+if (isProduction) {
+  if (!rawJwtSecret || rawJwtSecret.includes('change_in_production') || rawJwtSecret.length < 32) {
+    throw new Error(
+      'FATAL SECURITY CONFIGURATION: JWT_SECRET must be set in production to a secure random string of at least 32 characters.'
+    );
+  }
+  if (!rawCorsOrigin || rawCorsOrigin === '*' || rawCorsOrigin.split(',').some((o) => o.trim() === '*')) {
+    throw new Error(
+      'FATAL SECURITY CONFIGURATION: CORS_ORIGIN must be set in production to specific frontend origin(s) and cannot be missing or wildcard (*).'
+    );
+  }
 }
 
 export const config = {
   port: Number(process.env.PORT) || 3000,
   nodeEnv: process.env.NODE_ENV || 'development',
   jwtSecret: rawJwtSecret || 'dumline_dev_secret_key_change_in_production',
-  corsOrigin: process.env.CORS_ORIGIN || process.env.FRONTEND_URL || '*',
+  corsOrigin: rawCorsOrigin || '*',
   jwtExpiresInSeconds: 24 * 60 * 60, // 24 hours
   gstRate: 0.05, // 5% restaurant GST (all displayed prices are GST-inclusive)
   defaultMinPrepMinutes: 20,
