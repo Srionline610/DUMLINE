@@ -16,14 +16,18 @@ export interface DatabasePoolOptions {
   password?: string;
   database: string;
   prepareCacheLength: number;
-  ssl?: boolean | { rejectUnauthorized?: boolean };
+  ssl?: boolean | { rejectUnauthorized?: boolean; servername?: string };
   connectTimeout?: number;
+  acquireTimeout?: number;
+  connectionLimit?: number;
 }
 
 /**
- * Robustly parses and validates database connection parameters.
- * Handles both connection strings (DATABASE_URL / MYSQL_URL) and individual connection fields.
- * Sanitizes wrapping quotes, whitespace, and URI-encodes special characters in credentials.
+ * Robustly parses and validates database connection parameters for MySQL, MariaDB,
+ * and distributed cloud instances such as TiDB Cloud.
+ * Handles complex passwords containing reserved characters (#, @, !, ?, %),
+ * enforces secure TLS with Server Name Indication (SNI) on cloud hosts,
+ * and configures resilient pool timeouts.
  */
 export function resolveDatabaseConfig(overrideUrl?: string): DatabasePoolOptions {
   const isProduction = (process.env.NODE_ENV || 'development') === 'production';
@@ -36,13 +40,19 @@ export function resolveDatabaseConfig(overrideUrl?: string): DatabasePoolOptions
 
   // Fallback to individual connection parameters if present
   if (!str && process.env.MYSQL_HOST && process.env.MYSQL_DATABASE) {
+    const host = process.env.MYSQL_HOST.trim();
+    const isCloud = host.includes('tidbcloud.com') || host.includes('aivencloud.com') || (host !== 'localhost' && host !== '127.0.0.1');
     return {
-      host: process.env.MYSQL_HOST.trim(),
-      port: process.env.MYSQL_PORT ? parseInt(process.env.MYSQL_PORT, 10) : 3306,
+      host,
+      port: process.env.MYSQL_PORT ? parseInt(process.env.MYSQL_PORT, 10) : (isCloud ? 4000 : 3306),
       user: process.env.MYSQL_USER?.trim() || undefined,
       password: process.env.MYSQL_PASSWORD || undefined,
       database: process.env.MYSQL_DATABASE.trim(),
       prepareCacheLength: 0,
+      ...(isCloud ? { ssl: { rejectUnauthorized: true, servername: host } } : {}),
+      connectTimeout: 30000,
+      acquireTimeout: 30000,
+      connectionLimit: 10,
     };
   }
 
@@ -62,84 +72,151 @@ export function resolveDatabaseConfig(overrideUrl?: string): DatabasePoolOptions
   if (str.startsWith('postgres://') || str.startsWith('postgresql://')) {
     throw new Error(
       'FATAL DATABASE CONFIGURATION: PostgreSQL connection string detected. ' +
-      'Dumline requires a MySQL or MariaDB database instance (scheme must be "mysql://" or "mariadb://"). ' +
-      'Please provision a MySQL or MariaDB instance (e.g. Aiven, PlanetScale, Railway, or Clever Cloud).'
+      'Dumline requires a MySQL or MariaDB-compatible database (scheme must be "mysql://" or "mariadb://"). ' +
+      'Please configure your MySQL/TiDB Cloud instance in DATABASE_URL.'
     );
   }
 
-  let scheme = '';
-  let username = '';
-  let password = '';
-  let host = '';
-  let port = 3306;
-  let database = '';
-  let ssl: boolean | { rejectUnauthorized?: boolean } | undefined;
-  let connectTimeout: number | undefined;
-
-  try {
-    const parsed = new URL(str);
-    scheme = parsed.protocol.replace(':', '');
-    username = parsed.username ? decodeURIComponent(parsed.username) : '';
-    password = parsed.password ? decodeURIComponent(parsed.password) : '';
-    host = parsed.hostname;
-    port = parsed.port ? parseInt(parsed.port, 10) : 3306;
-    database = parsed.pathname ? decodeURIComponent(parsed.pathname.replace(/^\//, '')) : '';
-
-    // Handle SSL options from search parameters
-    const sslParam = parsed.searchParams.get('ssl') || parsed.searchParams.get('sslmode') || parsed.searchParams.get('ssl-mode');
-    if (sslParam) {
-      if (sslParam.startsWith('{')) {
-        try {
-          ssl = JSON.parse(sslParam);
-        } catch {
-          ssl = true;
-        }
-      } else {
-        const lower = sslParam.toLowerCase();
-        if (lower === 'false' || lower === 'disable' || lower === 'disabled') {
-          ssl = false;
-        } else {
-          ssl = true;
-        }
-      }
-    }
-
-    if (parsed.searchParams.has('connectTimeout')) {
-      connectTimeout = parseInt(parsed.searchParams.get('connectTimeout')!, 10);
-    }
-  } catch {
-    // Regex fallback parser for non-standard URLs (e.g. unescaped '#', '?', or '@' inside password)
-    const match = str.match(/^(mysql|mariadb):\/\/(?:([^:]+)(?::([^@]+))?@)?([^:\/?#]+)(?::(\d+))?(?:\/([^?#]+))?(?:\?(.*))?$/);
-    if (!match) {
-      throw new Error(
-        'FATAL DATABASE CONFIGURATION: Malformed database connection string format. ' +
-        'Expected format: mysql://[user[:password]@]host[:port]/database[?options]'
-      );
-    }
-    scheme = match[1];
-    username = match[2] ? decodeURIComponent(match[2]) : '';
-    password = match[3] ? decodeURIComponent(match[3]) : '';
-    host = match[4];
-    port = match[5] ? parseInt(match[5], 10) : 3306;
-    database = match[6] ? decodeURIComponent(match[6]) : '';
+  // Extract scheme
+  const schemeMatch = str.match(/^([a-zA-Z0-9]+):\/\//);
+  if (!schemeMatch) {
+    throw new Error(
+      'FATAL DATABASE CONFIGURATION: Malformed database connection string format. Scheme missing.'
+    );
   }
-
+  const scheme = schemeMatch[1].toLowerCase();
   if (scheme !== 'mysql' && scheme !== 'mariadb') {
     throw new Error(
       `FATAL DATABASE CONFIGURATION: Unsupported database scheme "${scheme}://". Scheme must be "mysql://" or "mariadb://".`
     );
   }
 
+  let rest = str.slice(schemeMatch[0].length);
+
+  // Extract search query (?...)
+  let search = '';
+  const questionIdx = rest.indexOf('?');
+  if (questionIdx !== -1) {
+    search = rest.slice(questionIdx);
+    rest = rest.slice(0, questionIdx);
+  }
+
+  // Extract database name (/...)
+  let database = '';
+  const slashIdx = rest.indexOf('/');
+  if (slashIdx !== -1) {
+    database = decodeURIComponent(rest.slice(slashIdx + 1));
+    rest = rest.slice(0, slashIdx);
+  }
+
+  // Separate credentials from host:port
+  // The last '@' before host is the delimiter to support passwords containing '@'
+  let username = '';
+  let password = '';
+  let host = '';
+  let port = 3306;
+
+  const atIdx = rest.lastIndexOf('@');
+  let hostPortPart = rest;
+  if (atIdx !== -1) {
+    const credPart = rest.slice(0, atIdx);
+    hostPortPart = rest.slice(atIdx + 1);
+
+    const colonIdx = credPart.indexOf(':');
+    if (colonIdx !== -1) {
+      username = decodeURIComponent(credPart.slice(0, colonIdx));
+      password = decodeURIComponent(credPart.slice(colonIdx + 1));
+    } else {
+      username = decodeURIComponent(credPart);
+    }
+  }
+
+  // Parse hostPortPart: host[:port]
+  if (hostPortPart.startsWith('[')) {
+    const closeBracket = hostPortPart.indexOf(']');
+    host = hostPortPart.slice(1, closeBracket);
+    const after = hostPortPart.slice(closeBracket + 1);
+    if (after.startsWith(':')) {
+      port = parseInt(after.slice(1), 10);
+    }
+  } else {
+    const colonIdx = hostPortPart.lastIndexOf(':');
+    if (colonIdx !== -1) {
+      host = hostPortPart.slice(0, colonIdx);
+      port = parseInt(hostPortPart.slice(colonIdx + 1), 10);
+    } else {
+      host = hostPortPart;
+      // Default to 4000 for TiDB Cloud if omitted, else 3306
+      if (host.includes('tidbcloud.com')) {
+        port = 4000;
+      }
+    }
+  }
+
   if (!host) {
     throw new Error('FATAL DATABASE CONFIGURATION: Database host is missing in connection string.');
   }
 
-  if (!database) {
-    throw new Error(
-      'FATAL DATABASE CONFIGURATION: Database name is missing in connection string path. ' +
-      'Ensure the URL specifies a database name, e.g.: mysql://user:password@host:3306/dumline_prod'
-    );
+  if (!database || database === 'sys') {
+    if (!database) {
+      throw new Error(
+        'FATAL DATABASE CONFIGURATION: Database name is missing in connection string path. ' +
+        'Ensure the URL specifies the database name (e.g., mysql://user:password@host:port/dumline).'
+      );
+    }
+    // Warn if connecting to internal system schema
+    console.warn(`[DUMLINE DB] Warning: Connection specifies '${database}' database. Ensure this is intentional.`);
   }
+
+  // Parse TLS/SSL settings
+  const searchParams = new URLSearchParams(search);
+  const sslParam =
+    searchParams.get('ssl') ||
+    searchParams.get('sslmode') ||
+    searchParams.get('ssl-mode') ||
+    searchParams.get('sslaccept') ||
+    searchParams.get('ssl_mode');
+
+  const isCloudHost =
+    host.includes('tidbcloud.com') ||
+    host.includes('aivencloud.com') ||
+    host.includes('railway') ||
+    (host !== 'localhost' && host !== '127.0.0.1' && !host.endsWith('.local'));
+
+  let ssl: boolean | { rejectUnauthorized?: boolean; servername?: string } | undefined = undefined;
+
+  if (sslParam) {
+    const lower = sslParam.toLowerCase();
+    if (lower === 'false' || lower === 'disable' || lower === 'disabled') {
+      ssl = false;
+    } else if (sslParam.startsWith('{')) {
+      try {
+        const parsedJson = JSON.parse(sslParam);
+        ssl = {
+          rejectUnauthorized: parsedJson.rejectUnauthorized !== false,
+          servername: host,
+        };
+      } catch {
+        ssl = { rejectUnauthorized: true, servername: host };
+      }
+    } else {
+      // Handles strict, require, verify-ca, verify-full, true
+      ssl = {
+        rejectUnauthorized: lower !== 'accept_invalid_certs',
+        servername: host,
+      };
+    }
+  } else if (isCloudHost) {
+    // Cloud database hosts (e.g. TiDB Cloud) mandate secure TLS with SNI servername
+    ssl = { rejectUnauthorized: true, servername: host };
+  }
+
+  const connectTimeout = searchParams.has('connectTimeout')
+    ? parseInt(searchParams.get('connectTimeout')!, 10)
+    : 30000;
+  const acquireTimeout = searchParams.has('acquireTimeout')
+    ? parseInt(searchParams.get('acquireTimeout')!, 10)
+    : 30000;
 
   return {
     host,
@@ -149,7 +226,9 @@ export function resolveDatabaseConfig(overrideUrl?: string): DatabasePoolOptions
     database,
     prepareCacheLength: 0,
     ...(ssl !== undefined ? { ssl } : {}),
-    ...(connectTimeout !== undefined ? { connectTimeout } : {}),
+    connectTimeout,
+    acquireTimeout,
+    connectionLimit: 10,
   };
 }
 

@@ -9,7 +9,8 @@ import { defineConfig } from "prisma/config";
 
 /**
  * Sanitize the datasource URL for Prisma CLI operations (generate, migrate, seed).
- * Strips accidental wrapping quotes, whitespace, and ensures mysql:// scheme.
+ * Strips accidental wrapping quotes, whitespace, ensures mysql:// scheme,
+ * and formats cloud TLS parameters (e.g. sslaccept=strict for TiDB Cloud).
  */
 function sanitizePrismaDatasourceUrl(raw?: string): string | undefined {
   if (!raw || typeof raw !== "string") return undefined;
@@ -21,6 +22,17 @@ function sanitizePrismaDatasourceUrl(raw?: string): string | undefined {
   if (str.startsWith("mariadb://")) {
     str = "mysql://" + str.slice("mariadb://".length);
   }
+
+  // Ensure TiDB Cloud and managed cloud databases receive strict SSL parameters for Prisma CLI
+  if (str.includes("tidbcloud.com") || str.includes("aivencloud.com")) {
+    if (str.includes("ssl=")) {
+      str = str.replace(/ssl=\{[^}]+\}/, "sslaccept=strict");
+    } else if (!str.includes("sslaccept=")) {
+      const sep = str.includes("?") ? "&" : "?";
+      str = `${str}${sep}sslaccept=strict`;
+    }
+  }
+
   return str;
 }
 

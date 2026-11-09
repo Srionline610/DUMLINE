@@ -209,7 +209,8 @@ async function bootstrapDatabase() {
       cp.execSync('npx ts-node --transpile-only src/prisma/seed.ts', { stdio: 'inherit', cwd: serverRoot });
       console.log('✅ Database fully bootstrapped and seeded.');
     } else {
-      console.error('⚠️ Database connection verification notice:', err.message);
+      const detailedCause = err.cause ? (err.cause.message || err.cause) : '';
+      console.error('⚠️ Database connection verification notice:', err.message, detailedCause ? `(Cause: ${detailedCause})` : '');
     }
   }
 }
