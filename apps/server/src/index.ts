@@ -1,4 +1,6 @@
 import * as http from 'http';
+import * as path from 'path';
+import * as cp from 'child_process';
 import { Server } from 'socket.io';
 import app from './app';
 import { config } from './config';
@@ -185,10 +187,38 @@ io.on('connection', (socket) => {
   });
 });
 
+async function bootstrapDatabase() {
+  try {
+    const userCount = await prisma.user.count();
+    console.log(`✅ Database connected successfully (${userCount} users present).`);
+    if (userCount === 0) {
+      console.log('⚡ Database connected but empty. Seeding initial data...');
+      const serverRoot = path.resolve(__dirname, '..');
+      cp.execSync('npx ts-node --transpile-only src/prisma/seed.ts', { stdio: 'inherit', cwd: serverRoot });
+      console.log('✅ Initial database seed completed.');
+    }
+  } catch (err: any) {
+    if (
+      err.message?.includes("Table") &&
+      (err.message?.includes("doesn't exist") || err.message?.includes("not found") || err.code === 'ER_NO_SUCH_TABLE')
+    ) {
+      console.log('⚠️ Database tables missing. Running initial Prisma migration deploy...');
+      const serverRoot = path.resolve(__dirname, '..');
+      cp.execSync('npx prisma migrate deploy --config src/prisma/prisma.config.ts', { stdio: 'inherit', cwd: serverRoot });
+      console.log('✅ Migrations applied. Running initial seed...');
+      cp.execSync('npx ts-node --transpile-only src/prisma/seed.ts', { stdio: 'inherit', cwd: serverRoot });
+      console.log('✅ Database fully bootstrapped and seeded.');
+    } else {
+      console.error('⚠️ Database connection verification notice:', err.message);
+    }
+  }
+}
+
 if (process.env.NODE_ENV !== 'test') {
   server.listen(config.port, config.host, () => {
     console.log(`🏰 Dumline API server running on ${config.host}:${config.port} (${config.nodeEnv})`);
     console.log(`🔌 Socket.IO endpoint ready`);
+    bootstrapDatabase().catch((e) => console.error('Database bootstrap error:', e.message));
   });
 }
 

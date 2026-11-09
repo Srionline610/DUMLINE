@@ -7,6 +7,7 @@
     "dev": "ts-node-dev src/index.ts",
     "build": "prisma generate --config src/prisma/prisma.config.ts",
     "start": "ts-node --transpile-only src/index.ts",
+    "start:prod": "prisma migrate deploy --config src/prisma/prisma.config.ts && ts-node --transpile-only src/prisma/seed.ts && ts-node --transpile-only src/index.ts",
     "migrate": "npx prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy --config src/prisma/prisma.config.ts",
     "seed": "ts-node src/prisma/seed.ts",
