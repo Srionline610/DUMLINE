@@ -18,7 +18,7 @@ export const ProcessPaymentRequestSchema = z
     idempotencyKey: z.string().trim().min(1).optional(),
   })
   .refine(
-    (data) => {
+    (data: { method?: string; vpa?: string; cardLast4?: string }) => {
       if (data.method === 'UPI' && !data.vpa) {
         return false;
       }
