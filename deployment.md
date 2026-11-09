@@ -274,6 +274,81 @@ In a production environment, DUMLINE is architected for containerized deployment
      proxy_http_version 1.1;
      ```
 
+### 10.3 Railway Step-by-Step Live Deployment Guide
+
+Railway is the recommended platform for deploying DUMLINE because it natively supports:
+- Managed MySQL 8 with zero configuration.
+- Persistent WebSockets for Socket.IO 4 without serverless timeout limits.
+- Monorepo multi-service deployments from a single GitHub repository.
+
+#### Step 1: Create a New Project on Railway
+1. Sign in to your [Railway](https://railway.app) account.
+2. Click **+ New Project**.
+3. Select **Deploy from GitHub repo** and choose `Srionline610/DUMLINE`.
+4. Cancel the initial automatic build if prompted; configure the 3 services explicitly below.
+
+#### Step 2: Provision MySQL Database Service
+1. In your Railway project canvas, click **+ Create** / **New Service** -> **Database** -> **Add MySQL**.
+2. Railway will spin up a managed MySQL 8 container in seconds.
+3. Click on the MySQL card -> navigate to **Variables**. Note that Railway automatically provides `MYSQL_URL` and `DATABASE_URL`.
+
+#### Step 3: Deploy Backend Service (`apps/server`)
+1. In the project canvas, click **+ Create** / **New Service** -> **GitHub Repo** -> select `Srionline610/DUMLINE`.
+2. Rename this service to `dumline-server` or `dumline-api`.
+3. In **Settings**:
+   - **Root Directory**: leave as `/` (root of monorepo).
+   - **Build Command**: `npm run build --workspace=@dumline/server`
+   - **Start Command**: `npm run start --workspace=@dumline/server`
+   - **Healthcheck Path**: `/health`
+4. In **Variables**, add:
+   - `DATABASE_URL`: `${{MySQL.DATABASE_URL}}` (or `${{MySQL.MYSQL_URL}}` via Railway variable reference)
+   - `NODE_ENV`: `production`
+   - `JWT_SECRET`: `dumline_production_secret_key_change_in_production_min_32_chars`
+   - `PORT`: `3000`
+   - `GEMINI_API_KEY`: *(Optional, for AI prep-time estimation; falls back cleanly if empty)*
+5. In **Networking**:
+   - Click **Generate Domain** to assign a public HTTPS domain (e.g., `dumline-api-production.up.railway.app`).
+6. Deploy the service. Verify that `GET /health` on your public domain returns:
+   ```json
+   {"status":"ok","service":"dumline-server","timestamp":"..."}
+   ```
+
+#### Step 4: Run Database Migrations & Seeds on Railway
+Once the backend container connects to MySQL:
+1. Open the `dumline-server` service in Railway -> select **Deployments** or **Settings**.
+2. Open the **Railway CLI** (or the web **Deploy Logs / Shell**):
+   ```bash
+   npx prisma migrate deploy --config apps/server/src/prisma/prisma.config.ts
+   npm run seed --workspace=@dumline/server
+   ```
+3. This creates all relational tables and seeds all 3 mandatory IsoCode Labs assessment orders, 3 Hyderabad branches, 8 culinary items, and 6 role-based user accounts.
+
+#### Step 5: Deploy Frontend Web Client (`apps/web`)
+1. In the project canvas, click **+ Create** / **New Service** -> **GitHub Repo** -> select `Srionline610/DUMLINE`.
+2. Rename this service to `dumline-web`.
+3. In **Settings**:
+   - **Root Directory**: leave as `/`
+   - **Build Command**: `npm run build --workspace=@dumline/web`
+   - **Start Command**: `npm run start --workspace=@dumline/web`
+4. In **Variables**, add:
+   - `NODE_ENV`: `production`
+   - `NEXT_PUBLIC_API_URL`: `https://<YOUR-BACKEND-DOMAIN>/api` (e.g., `https://dumline-api-production.up.railway.app/api`)
+   - `NEXT_PUBLIC_SOCKET_URL`: `https://<YOUR-BACKEND-DOMAIN>` (e.g., `https://dumline-api-production.up.railway.app`)
+5. In **Networking**:
+   - Click **Generate Domain** (e.g., `dumline-web-production.up.railway.app`).
+6. Deploy the service.
+
+#### Step 6: End-to-End Verification of Live Deployment
+1. Visit your frontend URL `https://<YOUR-FRONTEND-DOMAIN>`.
+2. Verify guest browsing: view Royal Hyderabadi menu items, spice customizations, and outlet information.
+3. Select the **Kondapur** branch.
+4. Add items to cart (e.g., Shahi Nizami Dum Mutton Biryani) and proceed to Checkout.
+5. Log in with customer account `customer@dumline.com` (password: `Customer@123`).
+6. Complete mock payment with UPI `success@upi` or Card ending in `4242`. Order creates with unique ID.
+7. Open a second browser tab, log in as Kitchen Staff `kitchen.kondapur@dumline.com` (password: `Kitchen@123`), and navigate to `/kds`.
+8. Confirm the new order appears in the Kondapur live kitchen queue in real-time via Socket.IO.
+9. Advance order status through `ACCEPTED` -> `PREPARING` -> `READY` and verify live status transitions on the customer's tracker screen.
+
 ---
 
 ## 11. Troubleshooting & FAQ

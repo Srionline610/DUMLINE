@@ -1,16 +1,26 @@
-import "dotenv/config";
+import * as path from "path";
+import * as dotenv from "dotenv";
 
-import { defineConfig, env } from "prisma/config";
+dotenv.config({ path: path.resolve(__dirname, "../../../../.env") });
+dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
+dotenv.config();
+
+import { defineConfig } from "prisma/config";
+
+const dbUrl =
+  process.env.DATABASE_URL ||
+  process.env.MYSQL_URL ||
+  "mysql://dumline_user:dumline_dev_password@localhost:3306/dumline_dev";
 
 export default defineConfig({
   schema: "./schema.prisma",
   migrations: {
     path: "./migrations",
-    // Prisma 7 seed command string – runs with ts-node from project root
     seed: "ts-node apps/server/src/prisma/seed.ts",
   },
   datasource: {
-    url: env("DATABASE_URL"),
+    url: dbUrl,
   },
 });
-

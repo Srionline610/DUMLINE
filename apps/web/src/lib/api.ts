@@ -16,7 +16,10 @@ import {
   OutletMenuOverride,
 } from '@dumline/shared';
 
-const API_BASE = '/api';
+const rawApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+const API_BASE = rawApiUrl
+  ? (rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl.replace(/\/+$/, '')}/api`)
+  : '/api';
 
 class ApiClient {
   private static async request<T>(
