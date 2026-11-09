@@ -9,6 +9,10 @@ export function getSocket(): Socket {
     socket = io(socketUrl, {
       transports: ['websocket', 'polling'],
       autoConnect: true,
+      auth: (cb) => {
+        const token = typeof window !== 'undefined' ? localStorage.getItem('dumline_token') : null;
+        cb({ token });
+      },
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
     });

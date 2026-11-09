@@ -299,12 +299,13 @@ Railway is the recommended platform for deploying DUMLINE because it natively su
 3. In **Settings**:
    - **Root Directory**: leave as `/` (root of monorepo).
    - **Build Command**: `npm run build --workspace=@dumline/shared && npm run generate --workspace=@dumline/server`
-   - **Start Command**: `npm run migrate:deploy --workspace=@dumline/server && npm run seed --workspace=@dumline/server && npm run start --workspace=@dumline/server`
+   - **Start Command**: `npm run migrate:deploy --workspace=@dumline/server && npm run start --workspace=@dumline/server`
    - **Healthcheck Path**: `/health`
 4. In **Variables**, add:
    - `DATABASE_URL`: `${{MySQL.DATABASE_URL}}` (using Railway's variable reference syntax)
    - `NODE_ENV`: `production`
-   - `JWT_SECRET`: `dumline_production_jwt_secret_key_minimum_32_characters`
+   - `JWT_SECRET`: *(Generate a unique 32+ character random secret using `openssl rand -hex 32` or `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`; do NOT use a predictable or default value. The backend will refuse to boot if missing or under 32 characters in production).*
+   - `CORS_ORIGIN`: `https://<YOUR-FRONTEND-DOMAIN>` (or leave unset/wildcard until frontend domain is generated)
    - `PORT`: (Auto-provided by Railway; defaults to 3000 if not set)
    - `GEMINI_API_KEY`: *(Optional, for AI prep-time estimation; falls back cleanly if empty)*
 5. In **Networking**:
@@ -313,6 +314,12 @@ Railway is the recommended platform for deploying DUMLINE because it natively su
    ```json
    {"status":"ok","service":"dumline-server","timestamp":"..."}
    ```
+7. **One-Time Database Seeding (Execute Once):**
+   Once the service is active, open the `dumline-server` service in Railway -> open the **Shell** tab (or Deploy Logs -> Shell) and run:
+   ```bash
+   npm run seed --workspace=@dumline/server
+   ```
+   *(This populates all 3 mandatory assessment seed fixtures, 3 Hyderabad branches, 8 menu items, and 6 role accounts. Decoupled from start command so it never re-runs on server restart).*
 
 #### Step 4: Deploy Frontend Web Client (`apps/web`)
 1. In the project canvas, click **+ Create** / **New Service** -> **GitHub Repo** -> select `Srionline610/DUMLINE`.

@@ -8,18 +8,31 @@ import { paymentRouter } from './routes/payment.routes';
 import { adminRouter } from './routes/admin.routes';
 import { AppError } from './utils/errors';
 import { sendError } from './utils/response';
+import { config } from './config';
 
 export const app = express();
 
 // Middleware
 app.use(express.json());
 
-// Basic CORS headers
-app.use((_req: Request, res: Response, next: NextFunction) => {
-  res.header('Access-Control-Allow-Origin', '*');
+// Production-ready CORS configuration
+const allowedOrigins = (config.corsOrigin || '*')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes('*')) {
+    res.header('Access-Control-Allow-Origin', '*');
+  } else if (typeof origin === 'string' && allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Vary', 'Origin');
+    res.header('Access-Control-Allow-Credentials', 'true');
+  }
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  if (_req.method === 'OPTIONS') {
+  if (req.method === 'OPTIONS') {
     res.sendStatus(204);
     return;
   }
