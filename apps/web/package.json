@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "prebuild": "node -e \"const cp = require('child_process'), path = require('path'); try { require.resolve('next', { paths: [process.cwd()] }); } catch (e) { console.log('[DUMLINE Web] Installing workspace dependencies for build...'); const root = path.resolve(process.cwd(), '../..'); try { cp.execSync('npm ci', { stdio: 'inherit', cwd: root }); } catch (err) { cp.execSync('npm install', { stdio: 'inherit', cwd: root }); } }\"",
     "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start",

@@ -5,15 +5,13 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "scripts": {
+    "prebuild": "node -e \"const cp = require('child_process'), path = require('path'); try { require.resolve('zod', { paths: [process.cwd()] }); } catch (e) { console.log('[DUMLINE Shared] Installing workspace dependencies for build...'); const root = path.resolve(process.cwd(), '../..'); try { cp.execSync('npm ci', { stdio: 'inherit', cwd: root }); } catch (err) { cp.execSync('npm install', { stdio: 'inherit', cwd: root }); } }\"",
     "build": "tsc -p .",
     "typecheck": "tsc --noEmit",
     "test": "node -e \"process.exit(0)\""
   },
   "dependencies": {
+    "typescript": "5.7.3",
     "zod": "3.23.8"
-  },
-  "devDependencies": {
-    "typescript": "5.7.3"
   }
 }
-
